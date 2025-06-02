@@ -11,34 +11,40 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ghidra: ['10.4']
+        ghidra: ['11.3.2']
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - name: Setup Java (JDK 21)
+        uses: actions/setup-java@v4
         with:
-          java-version: 17
+          java-version: 21
           distribution: temurin
 
       - name: Get short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
 
       - name: Setup Ghidra
-        uses: er28-0652/setup-ghidra@master
+        uses: printf-ui/setup-ghidra@master
         with:
           version: ${{ matrix.ghidra }}
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
       - name: Build GhidraOrbis
-        uses: eskatos/gradle-command-action@v2
-        with:
-          gradle-version: 8.3
-          arguments: buildExtension -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
+        run: ./gradlew buildExtension -PGHIDRA_INSTALL_DIR=${{ env.GHIDRA_INSTALL_DIR }}
 
       - name: Upload GhidraOrbis Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: dist/*.zip
           if-no-files-found: error
@@ -46,15 +52,18 @@ jobs:
   push_release:
     if: |
       github.event_name == 'push' &&
-      github.repository == 'astrelsky/GhidraOrbis'
+      github.repository == 'printf-ui/GhidraOrbis'
     needs: build_extensions
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
       - name: Download artifacts
-        uses: actions/download-artifact@v3
-      - name: Create Release
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create 1.0${{ GITHUB.RUN_NUMBER }} artifact/*.zip --target ${{ GITHUB.SHA }} -t 1.0${{ GITHUB.RUN_NUMBER }}
-
